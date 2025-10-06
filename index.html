@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Asistencia QR Pro</title>
+  <link rel="icon" href="https://i.imgur.com/1Nn6m3l.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Sistema profesional de asistencia con QR y registro en campo.">
+  <style>
+    @import url('https://fonts.googleapis.com/css?family=Roboto:400,700&display=swap');
+    body {
+      font-family: 'Roboto', sans-serif;
+      background: #f6f8fa;
+      margin: 0;
+      padding: 0;
+      color: #222;
+    }
+    header {
+      background: linear-gradient(90deg, #0d47a1, #1976d2);
+      color: white;
+      padding: 1rem 0 0.5rem 0;
+      text-align: center;
+    }
+    .logo { height: 48px; vertical-align: middle; }
+    nav {
+      display: flex;
+      justify-content: center;
+      background: #1565c0;
+    }
+    nav a {
+      color: #fff; text-decoration: none; margin: 0 1rem; padding: 0.5rem;
+      font-weight: 500; transition: background .2s;
+    }
+    nav a:hover, nav a.active { background: #1976d2; border-radius: 8px; }
+    main { max-width: 900px; margin: 2rem auto; background: #fff; box-shadow: 0 0 8px #eee; border-radius: 12px; padding:2rem;}
+    .card { background: #e3f2fd; padding: 1.2rem; border-radius: 8px; margin-bottom: 1rem; }
+    footer {
+      background: #0d47a1; color: #eee; text-align: center; padding: 1rem;
+      position: relative; margin-top: 2rem;
+      border-radius: 0 0 12px 12px;
+    }
+    .btn {
+      background: #1976d2; color: #fff; border: none; border-radius: 6px;
+      padding: 0.7rem 1.4rem; font-size: 1rem; cursor: pointer; font-weight: 500;
+      margin: 0.5rem 0;
+      box-shadow: 0 2px 8px #1976d23a;
+      transition: background .2s;
+    }
+    .btn:hover { background: #1565c0; }
+    input, select {
+      padding: 0.5rem; border: 1px solid #ccc; border-radius: 6px; margin-bottom: 1rem;
+      font-size: 1rem; width: 100%;
+    }
+    .section { margin-top: 2rem; margin-bottom: 2rem; }
+    @media (max-width: 600px) {
+      main { padding: 1rem; }
+      .section { margin-top:1rem; margin-bottom:1rem;}
+    }
+    .qr {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin: 1.5rem 0;
+    }
+    #qr-img { width: 160px; height: 160px; }
+    .success { color: green; font-weight: 600; }
+    .error { color: red; font-weight: 600; }
+    .table-responsive { overflow-x: auto; }
+    table { border-collapse: collapse; width: 100%; background: #fff;}
+    th, td { padding: 0.6rem; border-bottom: 1px solid #dbe2ef; text-align: left; }
+    th { background: #1976d2; color: #fff;}
+  </style>
+</head>
+<body>
+  <header>
+    <img src="https://i.imgur.com/1Nn6m3l.png" class="logo" alt="Logo">
+    <h1>Asistencia QR Pro</h1>
+    <p>Registro de asistencia profesional con QR y campo. <b>¡Rápido, seguro, flexible!</b></p>
+  </header>
+  <nav id="navbar" style="display:none;">
+    <a id="nav-home" class="active" href="#" onclick="showSection('home')">Inicio</a>
+    <a id="nav-hist" href="#" onclick="showSection('historial')">Historial</a>
+    <a id="nav-admin" href="#" onclick="showSection('admin')" style="display:none;">Admin</a>
+    <a id="nav-captura" href="#" onclick="showSection('captura')" style="display:none;">Captura</a>
+    <a id="logoutBtn" href="#" style="float:right;">Salir</a>
+  </nav>
+  <main>
+    <div id="loginSection" class="section">
+      <h2>Iniciar sesión</h2>
+      <input type="email" id="loginCorreo" placeholder="Correo institucional">
+      <button class="btn" onclick="login()">Ingresar</button>
+      <div id="loginMsg" class="error"></div>
+    </div>
+
+    <div id="homeSection" class="section" style="display:none;">
+      <div class="card">
+        <div id="modoCapturaMsg"></div>
+        <h2>¡Bienvenido <span id="usuarioNombre"></span>!</h2>
+        <div id="qrSection" style="display:none;">
+          <div class="qr">
+            <canvas id="qrCanvas"></canvas><br>
+            <button class="btn" onclick="actualizarQR()">Actualizar QR</button>
+          </div>
+        </div>
+        <div id="campoSection" style="display:none;">
+          <button class="btn" onclick="marcarCampo()">Registrar asistencia en campo</button>
+          <div id="campoMsg"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="historialSection" class="section" style="display:none;">
+      <h2>Historial de asistencias</h2>
+      <div class="table-responsive">
+        <table id="tablaHistorial">
+          <thead>
+            <tr>
+              <th>Fecha</th><th>Hora</th><th>Tipo</th><th>Ubicación</th><th>IP</th><th>Dispositivo</th><th>Estado</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="adminSection" class="section" style="display:none;">
+      <h2>Panel de administración</h2>
+      <div class="card">
+        <label>Modo de captura:</label>
+        <select id="modoSelect">
+          <option value="QR">QR</option>
+          <option value="Campo">Campo</option>
+          <option value="Ambos">Ambos</option>
+        </select>
+        <button class="btn" onclick="guardarModo()">Guardar modo</button>
+        <div id="modoAdminMsg"></div>
+      </div>
+      <div class="card" id="usuariosAdminSection" style="display:none;">
+        <h3>Permitir registro en campo por usuario</h3>
+        <table id="tablaUsuarios">
+          <thead>
+            <tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Permite campo</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="card">
+        <h3>Reporte de asistencias</h3>
+        <div class="table-responsive">
+          <table id="tablaReporte">
+            <thead>
+              <tr>
+                <th>Usuario</th><th>Fecha</th><th>Hora</th><th>Tipo</th><th>Ubicación</th><th>IP</th><th>Dispositivo</th><th>Estado</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="capturaSection" class="section" style="display:none;">
+      <h2>Captura de asistencias (QR)</h2>
+      <input type="text" id="tokenInput" placeholder="Escanea o ingresa el token QR">
+      <button class="btn" onclick="capturarQR()">Registrar</button>
+      <div id="capturaMsg"></div>
+    </div>
+  </main>
+  <footer>
+    <p><b>Asistencia QR Pro</b> &copy; 2025 | <i>Innovando el control de asistencia</i></p>
+    <small>Desarrollado por rimedhn • GitHub: <a href="https://github.com/rimedhn" style="color: #fff;">@rimedhn</a></small>
+  </footer>
+  <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
+  <script>
+    // Estado global
+    let usuario = null;
+    let modoCaptura = 'QR';
+
+    // Utilidad para llamar Apps Script backend
+    async function api(action, payload={}) {
+      return await google.script.run.withSuccessHandler(res => window._apiRes = res)
+                                   .withFailureHandler(e => window._apiRes = {error: String(e)})
+                                   .api(action, payload), window._apiRes;
+    }
+
+    async function login() {
+      const correo = document.getElementById('loginCorreo').value.trim();
+      if (!correo) return setMsg('loginMsg', 'Ingrese su correo', true);
+      usuario = await api('login', {correo});
+      if (usuario && !usuario.error) {
+        setMsg('loginMsg', '');
+        document.getElementById('loginSection').style.display = 'none';
+        document.getElementById('navbar').style.display = '';
+        cargarModoCaptura();
+        document.getElementById('usuarioNombre').textContent = usuario.nombre;
+        showSection('home');
+        if (usuario.rol === 'Admin') document.getElementById('nav-admin').style.display = '';
+        if (usuario.rol === 'Captura') document.getElementById('nav-captura').style.display = '';
+      } else {
+        setMsg('loginMsg', usuario.error || 'Usuario inválido', true);
+      }
+    }
+
+    async function cargarModoCaptura() {
+      const config = await api('getConfig');
+      modoCaptura = config.modo;
+      document.getElementById('modoCapturaMsg').textContent =
+        `Modo de captura actual: ${modoCaptura}`;
+      mostrarOpcionesCaptura();
+    }
+
+    function mostrarOpcionesCaptura() {
+      // Lógica de opciones QR, Campo, Ambos según usuario y config
+      document.getElementById('qrSection').style.display = 'none';
+      document.getElementById('campoSection').style.display = 'none';
+      if (usuario.rol === 'Empleado' || usuario.rol === 'Admin') {
+        if (modoCaptura === 'QR' ||
+            (modoCaptura === 'Ambos' && usuario.permiteCampo !== 'Sí')) {
+          document.getElementById('qrSection').style.display = '';
+          generarQR();
+        }
+        if (modoCaptura === 'Campo' ||
+            (modoCaptura === 'Ambos' && usuario.permiteCampo === 'Sí')) {
+          document.getElementById('campoSection').style.display = '';
+        }
+      }
+    }
+
+    async function generarQR() {
+      const res = await api('getQRToken', {id: usuario.id});
+      if (res.token) {
+        const qr = new QRious({ element: document.getElementById('qrCanvas'), value: res.token, size:160 });
+      }
+    }
+    async function actualizarQR() { await generarQR(); }
+
+    async function marcarCampo() {
+      setMsg('campoMsg', 'Registrando...');
+      let ubicacion = '', ip = '', userAgent = navigator.userAgent;
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(async pos => {
+          ubicacion = `${pos.coords.latitude},${pos.coords.longitude}`;
+          ip = await obtenerIP();
+          registrarCampoFinal(ubicacion, ip, userAgent);
+        }, err => {
+          ip = await obtenerIP();
+          registrarCampoFinal('', ip, userAgent);
+        });
+      } else {
+        ip = await obtenerIP();
+        registrarCampoFinal('', ip, userAgent);
+      }
+    }
+    async function obtenerIP() {
+      // Servicio externo para IP pública
+      try {
+        const resp = await fetch('https://api.ipify.org?format=json');
+        const data = await resp.json();
+        return data.ip;
+      } catch { return ''; }
+    }
+    async function registrarCampoFinal(ubicacion, ip, userAgent) {
+      const res = await api('registerCampo', {id: usuario.id, ubicacion, ip, userAgent});
+      setMsg('campoMsg', res.ok ? res.mensaje : res.error, !res.ok);
+      cargarHistorial();
+    }
+
+    async function cargarHistorial() {
+      const hist = await api('getAsistencias', {idUsuario: usuario.id});
+      const tbody = document.getElementById('tablaHistorial').querySelector('tbody');
+      tbody.innerHTML = '';
+      hist.forEach(r => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${r.fecha}</td><td>${r.hora}</td><td>${r.tipo}</td>
+          <td>${r.ubicacion}</td><td>${r.ip}</td><td>${r.userAgent}</td><td>${r.estado}</td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function showSection(sec) {
+      ['homeSection','historialSection','adminSection','capturaSection'].forEach(s =>
+        document.getElementById(s).style.display = 'none');
+      document.getElementById(`${sec}Section`).style.display = '';
+      document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
+      document.getElementById(`nav-${sec}`).classList.add('active');
+      if (sec === 'historial') cargarHistorial();
+      if (sec === 'admin') cargarAdmin();
+      if (sec === 'captura') cargarCaptura();
+    }
+
+    async function cargarAdmin() {
+      const config = await api('getConfig');
+      document.getElementById('modoSelect').value = config.modo;
+      if (config.modo === 'Ambos') document.getElementById('usuariosAdminSection').style.display = '';
+      else document.getElementById('usuariosAdminSection').style.display = 'none';
+      cargarUsuariosAdmin();
+      cargarReporte();
+    }
+
+    async function guardarModo() {
+      const modo = document.getElementById('modoSelect').value;
+      const res = await api('updateConfig', {modo});
+      setMsg('modoAdminMsg', `Modo actualizado a ${res.modo}`);
+      cargarAdmin();
+    }
+
+    async function cargarUsuariosAdmin() {
+      const users = await api('getUsers');
+      const tbody = document.getElementById('tablaUsuarios').querySelector('tbody');
+      tbody.innerHTML = '';
+      users.forEach(u => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${u.nombre}</td><td>${u.correo}</td><td>${u.rol}</td>
+          <td>
+            <input type="checkbox" ${u.permiteCampo === 'Sí' ? 'checked' : ''} onchange="toggleCampoUser('${u.id}',this.checked)">
+          </td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    async function toggleCampoUser(id, checked) {
+      await api('updateUserPermiteCampo', {id, permiteCampo: checked});
+      cargarUsuariosAdmin();
+    }
+
+    async function cargarReporte() {
+      const asists = await api('getAsistencias', {});
+      const tbody = document.getElementById('tablaReporte').querySelector('tbody');
+      tbody.innerHTML = '';
+      asists.forEach(r => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${r.nombre}</td><td>${r.fecha}</td><td>${r.hora}</td><td>${r.tipo}</td>
+          <td>${r.ubicacion}</td><td>${r.ip}</td><td>${r.userAgent}</td><td>${r.estado}</td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    async function cargarCaptura() {
+      document.getElementById('tokenInput').value = '';
+      setMsg('capturaMsg', '');
+    }
+
+    async function capturarQR() {
+      const token = document.getElementById('tokenInput').value.trim();
+      if (!token) return setMsg('capturaMsg', 'Ingrese el token QR', true);
+      setMsg('capturaMsg', 'Validando...');
+      const res = await api('registerQR', {token});
+      setMsg('capturaMsg', res.ok ? res.mensaje : res.error, !res.ok);
+      document.getElementById('tokenInput').value = '';
+    }
+
+    function setMsg(id, msg, error = false) {
+      const el = document.getElementById(id);
+      el.textContent = msg;
+      el.className = error ? 'error' : (msg ? 'success' : '');
+    }
+
+    document.getElementById('logoutBtn').onclick = () => {
+      usuario = null;
+      document.getElementById('navbar').style.display = 'none';
+      document.getElementById('loginSection').style.display = '';
+      document.getElementById('loginCorreo').value = '';
+      setMsg('loginMsg', '');
+    };
+  </script>
+</body>
+</html>
