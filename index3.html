@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Asistencia QR Pro</title>
+  <link rel="icon" href="https://i.imgur.com/1Nn6m3l.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="description" content="Sistema profesional de asistencia con QR y registro en campo.">
+  <style>
+    @import url('https://fonts.googleapis.com/css?family=Roboto:400,700&display=swap');
+    body {
+      font-family: 'Roboto', sans-serif;
+      background: #f6f8fa;
+      margin: 0;
+      padding: 0;
+      color: #222;
+      min-height: 100vh;
+    }
+    header {
+      background: linear-gradient(90deg, #0d47a1, #1976d2);
+      color: white;
+      padding: 1rem 0 0.5rem 0;
+      text-align: center;
+    }
+    .logo { height: 48px; vertical-align: middle; }
+    nav {
+      display: flex;
+      justify-content: center;
+      background: #1565c0;
+    }
+    nav a {
+      color: #fff; text-decoration: none; margin: 0 1rem; padding: 0.5rem;
+      font-weight: 500; transition: background .2s;
+      flex: 1 1 auto;
+      text-align: center;
+    }
+    nav a:hover, nav a.active { background: #1976d2; border-radius: 8px; }
+    main { max-width: 900px; margin: 0 auto; background: #fff; box-shadow: 0 0 8px #eee; border-radius: 12px; padding:2rem; min-height: 70vh;}
+    .card { background: #e3f2fd; padding: 1.2rem; border-radius: 8px; margin-bottom: 1rem; }
+    footer {
+      background: #0d47a1; color: #eee; text-align: center; padding: 1rem;
+      position: relative; margin-top: 2rem;
+      border-radius: 0 0 12px 12px;
+      width: 100vw;
+    }
+    .btn {
+      background: #1976d2; color: #fff; border: none; border-radius: 6px;
+      padding: 0.9rem 1.6rem; font-size: 1.1rem; cursor: pointer; font-weight: 500;
+      margin: 0.5rem 0;
+      box-shadow: 0 2px 8px #1976d23a;
+      transition: background .2s;
+      width: 100%;
+      max-width: 350px;
+      display: block;
+    }
+    .btn:hover { background: #1565c0; }
+    input, select {
+      padding: 1rem; border: 1px solid #ccc; border-radius: 6px; margin-bottom: 1rem;
+      font-size: 1.1rem; width: 100%; box-sizing: border-box;
+    }
+    .section { margin-top: 2rem; margin-bottom: 2rem; }
+    @media (max-width: 800px) {
+      main { padding: 0.5rem; border-radius: 0; max-width: 100vw; min-height: 100vh;}
+      .section { margin-top:1rem; margin-bottom:1rem;}
+      input, select { font-size: 1.05rem; padding: 0.7rem; }
+      .btn { font-size: 1.05rem; padding: 0.7rem 1.2rem; max-width: 98vw; }
+      h1 { font-size: 1.5em; }
+      h2 { font-size: 1.2em; }
+      h3 { font-size: 1em; }
+      .qr { margin: 1rem 0; }
+      table td, table th { font-size: 0.95em;}
+    }
+    .qr {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin: 1.5rem 0;
+    }
+    #qr-img { width: 160px; height: 160px; }
+    .success { color: green; font-weight: 600; }
+    .error { color: red; font-weight: 600; }
+    .table-responsive { overflow-x: auto; }
+    table { border-collapse: collapse; width: 100%; background: #fff;}
+    th, td { padding: 0.6rem; border-bottom: 1px solid #dbe2ef; text-align: left; }
+    th { background: #1976d2; color: #fff;}
+    #qrScanBtn, #qrScanBtnCaptura { margin-bottom: 1rem;}
+    #qrVideo, #qrVideoCaptura { width: 100%; max-width: 350px; margin-bottom: 1rem; }
+    #descargarReporteBtn { margin: 1rem auto 0 auto; }
+    #logoutBtn { margin-left: auto;}
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.10/html5-qrcode.min.js"></script>
+</head>
+<body>
+  <header>
+    <img src="https://i.imgur.com/1Nn6m3l.png" class="logo" alt="Logo">
+    <h1>Asistencia QR Pro</h1>
+    <p>Registro de asistencia profesional con QR y campo. <b>¡Rápido, seguro, flexible!</b></p>
+  </header>
+  <nav id="navbar" style="display:none;">
+    <a id="nav-home" class="active" href="#" onclick="showSection('home')">Inicio</a>
+    <a id="nav-hist" href="#" onclick="showSection('historial')">Historial</a>
+    <a id="nav-admin" href="#" onclick="showSection('admin')" style="display:none;">Admin</a>
+    <a id="nav-captura" href="#" onclick="showSection('captura')" style="display:none;">Captura</a>
+    <a id="logoutBtn" href="#" style="float:right;">Salir</a>
+  </nav>
+  <main>
+    <div id="loginSection" class="section">
+      <h2>Iniciar sesión</h2>
+      <input type="email" id="loginCorreo" placeholder="Correo institucional">
+      <input type="password" id="loginPass" placeholder="Contraseña">
+      <button class="btn" onclick="login()">Ingresar</button>
+      <div id="loginMsg" class="error"></div>
+    </div>
+
+    <div id="homeSection" class="section" style="display:none;">
+      <div class="card">
+        <div id="modoCapturaMsg"></div>
+        <h2>¡Bienvenido <span id="usuarioNombre"></span>!</h2>
+        <div id="qrSection">
+          <div class="qr">
+            <canvas id="qrCanvas"></canvas><br>
+            <button class="btn" onclick="actualizarQR()">Actualizar QR</button>
+            <button class="btn" id="qrScanBtn" onclick="abrirQRScanner()" style="display:none;">Escanear QR</button>
+            <div id="qrVideoContainer" style="display:none;">
+              <div id="qrVideo"></div>
+              <button class="btn" onclick="cerrarQRScanner()">Cerrar cámara</button>
+            </div>
+          </div>
+        </div>
+        <div id="campoSection" style="display:none;">
+          <button class="btn" onclick="marcarCampo()">Registrar asistencia en campo</button>
+          <div id="campoMsg"></div>
+        </div>
+      </div>
+      <div class="card" id="historialEmpleadoCard">
+        <h3>Historial de asistencias</h3>
+        <div class="table-responsive">
+          <table id="tablaHistorial">
+            <thead>
+              <tr>
+                <th>Fecha</th><th>Hora</th><th>Tipo</th><th>Ubicación</th><th>IP</th><th>Dispositivo</th><th>Estado</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="historialSection" class="section" style="display:none;">
+      <h2>Historial de asistencias</h2>
+      <div class="table-responsive">
+        <table id="tablaHistorial">
+          <thead>
+            <tr>
+              <th>Fecha</th><th>Hora</th><th>Tipo</th><th>Ubicación</th><th>IP</th><th>Dispositivo</th><th>Estado</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="adminSection" class="section" style="display:none;">
+      <h2>Panel de administración</h2>
+      <div class="card">
+        <label>Modo de captura:</label>
+        <select id="modoSelect">
+          <option value="QR">QR</option>
+          <option value="Campo">Campo</option>
+          <option value="Ambos">Ambos</option>
+        </select>
+        <button class="btn" onclick="guardarModo()">Guardar modo</button>
+        <div id="modoAdminMsg"></div>
+      </div>
+      <div class="card" id="usuariosAdminSection" style="display:none;">
+        <h3>Permitir registro en campo por usuario</h3>
+        <table id="tablaUsuarios">
+          <thead>
+            <tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Permite campo</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="card">
+        <h3>Reporte de asistencias</h3>
+        <button class="btn" id="descargarReporteBtn" onclick="descargarReporte()">Descargar CSV</button>
+        <div class="table-responsive">
+          <table id="tablaReporte">
+            <thead>
+              <tr>
+                <th>Usuario</th><th>Fecha</th><th>Hora</th><th>Tipo</th><th>Ubicación</th><th>IP</th><th>Dispositivo</th><th>Estado</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="capturaSection" class="section" style="display:none;">
+      <h2>Captura de asistencias (QR)</h2>
+      <input type="text" id="tokenInput" placeholder="Escanea o ingresa el token QR">
+      <button class="btn" onclick="capturarQR()">Registrar</button>
+      <button class="btn" id="qrScanBtnCaptura" onclick="abrirQRScannerCaptura()" style="display:none;">Escanear QR</button>
+      <div id="qrVideoContainerCaptura" style="display:none;">
+        <div id="qrVideoCaptura"></div>
+        <button class="btn" onclick="cerrarQRScannerCaptura()">Cerrar cámara</button>
+      </div>
+      <div id="capturaMsg"></div>
+      <h3>Historial de asistencias recientes</h3>
+      <div class="table-responsive">
+        <table id="tablaHistorialCaptura">
+          <thead>
+            <tr>
+              <th>Fecha</th><th>Hora</th><th>Tipo</th><th>Ubicación</th><th>IP</th><th>Dispositivo</th><th>Estado</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+  <footer>
+    <p><b>Asistencia QR Pro</b> &copy; 2025 | <i>Innovando el control de asistencia</i></p>
+    <small>Desarrollado por rimedhn • GitHub: <a href="https://github.com/rimedhn" style="color: #fff;">@rimedhn</a></small>
+  </footer>
+  <script>
+    let usuario = null;
+    let modoCaptura = 'QR';
+    let qrScanner = null, qrScannerCaptura = null;
+    let loginKey = "asistenciaqrpro_login";
+
+    // ----------- LOGIN Y SESIÓN -----------
+
+    function guardarSesion() {
+      if (usuario) localStorage.setItem(loginKey, JSON.stringify(usuario));
+    }
+    function cargarSesion() {
+      const u = localStorage.getItem(loginKey);
+      if (u) usuario = JSON.parse(u);
+      return !!usuario;
+    }
+    function limpiarSesion() {
+      usuario = null;
+      localStorage.removeItem(loginKey);
+    }
+
+    function mostrarSoloLogin() {
+      document.getElementById('navbar').style.display = 'none';
+      document.getElementById('loginSection').style.display = '';
+      ['homeSection','historialSection','adminSection','capturaSection'].forEach(s =>
+        document.getElementById(s).style.display = 'none');
+      document.getElementById('loginCorreo').value = '';
+      document.getElementById('loginPass').value = '';
+      setMsg('loginMsg', '');
+    }
+
+    function login() {
+      const correo = document.getElementById('loginCorreo').value.trim();
+      const password = document.getElementById('loginPass').value.trim();
+      if (!correo || !password) return setMsg('loginMsg', 'Ingrese correo y contraseña', true);
+
+      google.script.run
+        .withSuccessHandler(res => {
+          if (res && !res.error) {
+            usuario = res;
+            guardarSesion();
+            document.getElementById('loginSection').style.display = 'none';
+            document.getElementById('navbar').style.display = '';
+            cargarModoCaptura();
+            document.getElementById('usuarioNombre').textContent = usuario.nombre;
+            if (usuario.rol === 'Admin') document.getElementById('nav-admin').style.display = '';
+            if (usuario.rol === 'Captura') {
+              document.getElementById('nav-captura').style.display = '';
+              showSection('captura'); // ir directo a captura
+            } else {
+              showSection('home');
+            }
+          } else {
+            setMsg('loginMsg', res.error || 'Usuario inválido', true);
+          }
+        })
+        .withFailureHandler(e => setMsg('loginMsg', String(e), true))
+        .api('login', {correo, password});
+    }
+
+    document.getElementById('logoutBtn').onclick = () => {
+      limpiarSesion();
+      mostrarSoloLogin();
+      document.getElementById('nav-admin').style.display = 'none';
+      document.getElementById('nav-captura').style.display = 'none';
+    };
+
+    window.onload = function() {
+      if (cargarSesion()) {
+        document.getElementById('loginSection').style.display = 'none';
+        document.getElementById('navbar').style.display = '';
+        document.getElementById('usuarioNombre').textContent = usuario.nombre;
+        cargarModoCaptura();
+        if (usuario.rol === 'Admin') document.getElementById('nav-admin').style.display = '';
+        if (usuario.rol === 'Captura') {
+          document.getElementById('nav-captura').style.display = '';
+          showSection('captura');
+        } else {
+          showSection('home');
+        }
+      } else {
+        mostrarSoloLogin();
+      }
+      // Mostrar botón escanear QR si es móvil/tablet
+      if (esMovilTablet()) {
+        document.getElementById('qrScanBtn').style.display = '';
+        document.getElementById('qrScanBtnCaptura').style.display = '';
+      }
+    };
+
+    // ----------- FUNCIONES PRINCIPALES -----------
+
+    function cargarModoCaptura() {
+      google.script.run.withSuccessHandler(config => {
+        modoCaptura = config.modo;
+        document.getElementById('modoCapturaMsg').textContent =
+          `Modo de captura actual: ${modoCaptura}`;
+        mostrarOpcionesCaptura();
+      }).api('getConfig');
+    }
+
+    function mostrarOpcionesCaptura() {
+      document.getElementById('qrSection').style.display = '';
+      document.getElementById('campoSection').style.display = 'none';
+      // SIEMPRE mostrar QR, y si tiene campo autorizado mostrar también botón campo
+      if (usuario.rol === 'Empleado' || usuario.rol === 'Admin') {
+        generarQR();
+        if (modoCaptura === 'Campo' ||
+            (modoCaptura === 'Ambos' && usuario.permiteCampo === 'Sí')) {
+          document.getElementById('campoSection').style.display = '';
+        }
+      }
+      cargarHistorialEmpleado(); // Mostrar historial en home
+    }
+
+    function generarQR() {
+      google.script.run.withSuccessHandler(res => {
+        if (res.token) {
+          new QRious({ element: document.getElementById('qrCanvas'), value: res.token, size:160 });
+        }
+      }).api('getQRToken', {id: usuario.id});
+    }
+    function actualizarQR() { generarQR(); }
+
+    function marcarCampo() {
+      setMsg('campoMsg', 'Registrando...');
+      let ubicacion = '', ip = '', userAgent = navigator.userAgent;
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(async pos => {
+          ubicacion = `${pos.coords.latitude},${pos.coords.longitude}`;
+          ip = await obtenerIP();
+          registrarCampoFinal(ubicacion, ip, userAgent);
+        }, async err => {
+          ip = await obtenerIP();
+          registrarCampoFinal('', ip, userAgent);
+        });
+      } else {
+        obtenerIP().then(ip => registrarCampoFinal('', ip, userAgent));
+      }
+    }
+    async function obtenerIP() {
+      try {
+        const resp = await fetch('https://api.ipify.org?format=json');
+        const data = await resp.json();
+        return data.ip;
+      } catch { return ''; }
+    }
+    function registrarCampoFinal(ubicacion, ip, userAgent) {
+      google.script.run.withSuccessHandler(res => {
+        setMsg('campoMsg', res.ok ? res.mensaje : res.error, !res.ok);
+        cargarHistorialEmpleado();
+      }).api('registerCampo', {id: usuario.id, ubicacion, ip, userAgent});
+    }
+
+    function cargarHistorialEmpleado() {
+      google.script.run.withSuccessHandler(hist => {
+        const tbody = document.getElementById('tablaHistorial').querySelector('tbody');
+        tbody.innerHTML = '';
+        hist.reverse().forEach(r => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${r.fecha}</td><td>${r.hora}</td><td>${r.tipo}</td>
+            <td>${r.ubicacion}</td><td>${r.ip}</td><td>${r.userAgent}</td><td>${r.estado}</td>`;
+          tbody.appendChild(tr);
+        });
+      }).api('getAsistencias', {idUsuario: usuario.id});
+    }
+
+    function cargarHistorial() {
+      google.script.run.withSuccessHandler(hist => {
+        const tbody = document.getElementById('tablaHistorial').querySelector('tbody');
+        tbody.innerHTML = '';
+        hist.reverse().forEach(r => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${r.fecha}</td><td>${r.hora}</td><td>${r.tipo}</td>
+            <td>${r.ubicacion}</td><td>${r.ip}</td><td>${r.userAgent}</td><td>${r.estado}</td>`;
+          tbody.appendChild(tr);
+        });
+      }).api('getAsistencias', {idUsuario: usuario.id});
+    }
+
+    function cargarHistorialCaptura() {
+      google.script.run.withSuccessHandler(hist => {
+        const tbody = document.getElementById('tablaHistorialCaptura').querySelector('tbody');
+        tbody.innerHTML = '';
+        hist.reverse().forEach(r => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${r.fecha}</td><td>${r.hora}</td><td>${r.tipo}</td>
+            <td>${r.ubicacion}</td><td>${r.ip}</td><td>${r.userAgent}</td><td>${r.estado}</td>`;
+          tbody.appendChild(tr);
+        });
+      }).api('getAsistencias', {idUsuario: usuario.id});
+    }
+
+    function showSection(sec) {
+      ['homeSection','historialSection','adminSection','capturaSection'].forEach(s =>
+        document.getElementById(s).style.display = 'none');
+      document.getElementById(`${sec}Section`).style.display = '';
+      document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
+      document.getElementById(`nav-${sec}`).classList.add('active');
+      if (sec === 'home') {
+        mostrarOpcionesCaptura();
+      }
+      if (sec === 'historial') cargarHistorial();
+      if (sec === 'admin') cargarAdmin();
+      if (sec === 'captura') {
+        cargarCaptura();
+        cargarHistorialCaptura();
+      }
+    }
+
+    function cargarAdmin() {
+      google.script.run.withSuccessHandler(config => {
+        document.getElementById('modoSelect').value = config.modo;
+        if (config.modo === 'Ambos') document.getElementById('usuariosAdminSection').style.display = '';
+        else document.getElementById('usuariosAdminSection').style.display = 'none';
+        cargarUsuariosAdmin();
+        cargarReporte();
+      }).api('getConfig');
+    }
+
+    function guardarModo() {
+      const modo = document.getElementById('modoSelect').value;
+      google.script.run.withSuccessHandler(res => {
+        setMsg('modoAdminMsg', `Modo actualizado a ${res.modo}`);
+        cargarAdmin();
+      }).api('updateConfig', {modo});
+    }
+
+    function cargarUsuariosAdmin() {
+      google.script.run.withSuccessHandler(users => {
+        const tbody = document.getElementById('tablaUsuarios').querySelector('tbody');
+        tbody.innerHTML = '';
+        users.forEach(u => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${u.nombre}</td><td>${u.correo}</td><td>${u.rol}</td>
+            <td>
+              <input type="checkbox" ${u.permiteCampo === 'Sí' ? 'checked' : ''} onchange="toggleCampoUser('${u.id}',this.checked)">
+            </td>`;
+          tbody.appendChild(tr);
+        });
+      }).api('getUsers');
+    }
+
+    function toggleCampoUser(id, checked) {
+      google.script.run.withSuccessHandler(() => cargarUsuariosAdmin())
+        .api('updateUserPermiteCampo', {id, permiteCampo: checked});
+    }
+
+    function cargarReporte() {
+      google.script.run.withSuccessHandler(asists => {
+        const tbody = document.getElementById('tablaReporte').querySelector('tbody');
+        tbody.innerHTML = '';
+        asists.reverse().forEach(r => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${r.nombre}</td><td>${r.fecha}</td><td>${r.hora}</td><td>${r.tipo}</td>
+            <td>${r.ubicacion}</td><td>${r.ip}</td><td>${r.userAgent}</td><td>${r.estado}</td>`;
+          tbody.appendChild(tr);
+        });
+      }).api('getAsistencias', {});
+    }
+
+    function descargarReporte() {
+      google.script.run.withSuccessHandler(res => {
+        if (!res.csv) return alert("No hay datos para descargar.");
+        const a = document.createElement('a');
+        a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(res.csv);
+        a.download = 'reporte_asistencias.csv';
+        a.click();
+      }).api('getAsistenciasCSV');
+    }
+
+    function cargarCaptura() {
+      document.getElementById('tokenInput').value = '';
+      setMsg('capturaMsg', '');
+    }
+
+    function capturarQR() {
+      const token = document.getElementById('tokenInput').value.trim();
+      if (!token) return setMsg('capturaMsg', 'Ingrese el token QR', true);
+      setMsg('capturaMsg', 'Validando...');
+      google.script.run.withSuccessHandler(res => {
+        setMsg('capturaMsg', res.ok ? res.mensaje : res.error, !res.ok);
+        document.getElementById('tokenInput').value = '';
+        cargarHistorialCaptura();
+      }).api('registerQR', {token});
+    }
+
+    function setMsg(id, msg, error = false) {
+      const el = document.getElementById(id);
+      el.textContent = msg;
+      el.className = error ? 'error' : (msg ? 'success' : '');
+    }
+
+    // ----------- QR SCANNER (MÓVIL/TABLET) -----------
+
+    function esMovilTablet() {
+      return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    }
+
+    function abrirQRScanner() {
+      document.getElementById('qrVideoContainer').style.display = '';
+      qrScanner = new Html5Qrcode("qrVideo");
+      qrScanner.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: 200 },
+        qrCodeMessage => {
+          document.getElementById('qrVideoContainer').style.display = 'none';
+          qrScanner.stop();
+          qrScanner.clear();
+          qrScanner = null;
+          document.getElementById('tokenInput').value = qrCodeMessage;
+          capturarQR();
+        },
+        error => {}
+      ).catch(err => setMsg('qrVideoContainer', "Error al abrir cámara", true));
+    }
+    function cerrarQRScanner() {
+      if (qrScanner) {
+        qrScanner.stop();
+        qrScanner.clear();
+        qrScanner = null;
+      }
+      document.getElementById('qrVideoContainer').style.display = 'none';
+    }
+
+    function abrirQRScannerCaptura() {
+      document.getElementById('qrVideoContainerCaptura').style.display = '';
+      qrScannerCaptura = new Html5Qrcode("qrVideoCaptura");
+      qrScannerCaptura.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: 200 },
+        qrCodeMessage => {
+          document.getElementById('qrVideoContainerCaptura').style.display = 'none';
+          qrScannerCaptura.stop();
+          qrScannerCaptura.clear();
+          qrScannerCaptura = null;
+          document.getElementById('tokenInput').value = qrCodeMessage;
+          capturarQR();
+        },
+        error => {}
+      ).catch(err => setMsg('qrVideoContainerCaptura', "Error al abrir cámara", true));
+    }
+    function cerrarQRScannerCaptura() {
+      if (qrScannerCaptura) {
+        qrScannerCaptura.stop();
+        qrScannerCaptura.clear();
+        qrScannerCaptura = null;
+      }
+      document.getElementById('qrVideoContainerCaptura').style.display = 'none';
+    }
+  </script>
+</body>
+</html>
