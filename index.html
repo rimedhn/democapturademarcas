@@ -88,6 +88,7 @@
     <div id="loginSection" class="section">
       <h2>Iniciar sesión</h2>
       <input type="email" id="loginCorreo" placeholder="Correo institucional">
+      <input type="password" id="loginPass" placeholder="Contraseña">
       <button class="btn" onclick="login()">Ingresar</button>
       <div id="loginMsg" class="error"></div>
     </div>
@@ -172,45 +173,44 @@
   </footer>
   <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
   <script>
-    // Estado global
     let usuario = null;
     let modoCaptura = 'QR';
 
-    // Utilidad para llamar Apps Script backend
-    async function api(action, payload={}) {
-      return await google.script.run.withSuccessHandler(res => window._apiRes = res)
-                                   .withFailureHandler(e => window._apiRes = {error: String(e)})
-                                   .api(action, payload), window._apiRes;
-    }
-
-    async function login() {
+    function login() {
       const correo = document.getElementById('loginCorreo').value.trim();
-      if (!correo) return setMsg('loginMsg', 'Ingrese su correo', true);
-      usuario = await api('login', {correo});
-      if (usuario && !usuario.error) {
-        setMsg('loginMsg', '');
-        document.getElementById('loginSection').style.display = 'none';
-        document.getElementById('navbar').style.display = '';
-        cargarModoCaptura();
-        document.getElementById('usuarioNombre').textContent = usuario.nombre;
-        showSection('home');
-        if (usuario.rol === 'Admin') document.getElementById('nav-admin').style.display = '';
-        if (usuario.rol === 'Captura') document.getElementById('nav-captura').style.display = '';
-      } else {
-        setMsg('loginMsg', usuario.error || 'Usuario inválido', true);
-      }
+      const password = document.getElementById('loginPass').value.trim();
+      if (!correo || !password) return setMsg('loginMsg', 'Ingrese correo y contraseña', true);
+
+      google.script.run
+        .withSuccessHandler(res => {
+          if (res && !res.error) {
+            usuario = res;
+            setMsg('loginMsg', '');
+            document.getElementById('loginSection').style.display = 'none';
+            document.getElementById('navbar').style.display = '';
+            cargarModoCaptura();
+            document.getElementById('usuarioNombre').textContent = usuario.nombre;
+            showSection('home');
+            if (usuario.rol === 'Admin') document.getElementById('nav-admin').style.display = '';
+            if (usuario.rol === 'Captura') document.getElementById('nav-captura').style.display = '';
+          } else {
+            setMsg('loginMsg', res.error || 'Usuario inválido', true);
+          }
+        })
+        .withFailureHandler(e => setMsg('loginMsg', String(e), true))
+        .api('login', {correo, password});
     }
 
-    async function cargarModoCaptura() {
-      const config = await api('getConfig');
-      modoCaptura = config.modo;
-      document.getElementById('modoCapturaMsg').textContent =
-        `Modo de captura actual: ${modoCaptura}`;
-      mostrarOpcionesCaptura();
+    function cargarModoCaptura() {
+      google.script.run.withSuccessHandler(config => {
+        modoCaptura = config.modo;
+        document.getElementById('modoCapturaMsg').textContent =
+          `Modo de captura actual: ${modoCaptura}`;
+        mostrarOpcionesCaptura();
+      }).api('getConfig');
     }
 
     function mostrarOpcionesCaptura() {
-      // Lógica de opciones QR, Campo, Ambos según usuario y config
       document.getElementById('qrSection').style.display = 'none';
       document.getElementById('campoSection').style.display = 'none';
       if (usuario.rol === 'Empleado' || usuario.rol === 'Admin') {
@@ -226,15 +226,16 @@
       }
     }
 
-    async function generarQR() {
-      const res = await api('getQRToken', {id: usuario.id});
-      if (res.token) {
-        const qr = new QRious({ element: document.getElementById('qrCanvas'), value: res.token, size:160 });
-      }
+    function generarQR() {
+      google.script.run.withSuccessHandler(res => {
+        if (res.token) {
+          new QRious({ element: document.getElementById('qrCanvas'), value: res.token, size:160 });
+        }
+      }).api('getQRToken', {id: usuario.id});
     }
-    async function actualizarQR() { await generarQR(); }
+    function actualizarQR() { generarQR(); }
 
-    async function marcarCampo() {
+    function marcarCampo() {
       setMsg('campoMsg', 'Registrando...');
       let ubicacion = '', ip = '', userAgent = navigator.userAgent;
       if (navigator.geolocation) {
@@ -242,39 +243,39 @@
           ubicacion = `${pos.coords.latitude},${pos.coords.longitude}`;
           ip = await obtenerIP();
           registrarCampoFinal(ubicacion, ip, userAgent);
-        }, err => {
+        }, async err => {
           ip = await obtenerIP();
           registrarCampoFinal('', ip, userAgent);
         });
       } else {
-        ip = await obtenerIP();
-        registrarCampoFinal('', ip, userAgent);
+        obtenerIP().then(ip => registrarCampoFinal('', ip, userAgent));
       }
     }
     async function obtenerIP() {
-      // Servicio externo para IP pública
       try {
         const resp = await fetch('https://api.ipify.org?format=json');
         const data = await resp.json();
         return data.ip;
       } catch { return ''; }
     }
-    async function registrarCampoFinal(ubicacion, ip, userAgent) {
-      const res = await api('registerCampo', {id: usuario.id, ubicacion, ip, userAgent});
-      setMsg('campoMsg', res.ok ? res.mensaje : res.error, !res.ok);
-      cargarHistorial();
+    function registrarCampoFinal(ubicacion, ip, userAgent) {
+      google.script.run.withSuccessHandler(res => {
+        setMsg('campoMsg', res.ok ? res.mensaje : res.error, !res.ok);
+        cargarHistorial();
+      }).api('registerCampo', {id: usuario.id, ubicacion, ip, userAgent});
     }
 
-    async function cargarHistorial() {
-      const hist = await api('getAsistencias', {idUsuario: usuario.id});
-      const tbody = document.getElementById('tablaHistorial').querySelector('tbody');
-      tbody.innerHTML = '';
-      hist.forEach(r => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${r.fecha}</td><td>${r.hora}</td><td>${r.tipo}</td>
-          <td>${r.ubicacion}</td><td>${r.ip}</td><td>${r.userAgent}</td><td>${r.estado}</td>`;
-        tbody.appendChild(tr);
-      });
+    function cargarHistorial() {
+      google.script.run.withSuccessHandler(hist => {
+        const tbody = document.getElementById('tablaHistorial').querySelector('tbody');
+        tbody.innerHTML = '';
+        hist.forEach(r => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${r.fecha}</td><td>${r.hora}</td><td>${r.tipo}</td>
+            <td>${r.ubicacion}</td><td>${r.ip}</td><td>${r.userAgent}</td><td>${r.estado}</td>`;
+          tbody.appendChild(tr);
+        });
+      }).api('getAsistencias', {idUsuario: usuario.id});
     }
 
     function showSection(sec) {
@@ -288,65 +289,70 @@
       if (sec === 'captura') cargarCaptura();
     }
 
-    async function cargarAdmin() {
-      const config = await api('getConfig');
-      document.getElementById('modoSelect').value = config.modo;
-      if (config.modo === 'Ambos') document.getElementById('usuariosAdminSection').style.display = '';
-      else document.getElementById('usuariosAdminSection').style.display = 'none';
-      cargarUsuariosAdmin();
-      cargarReporte();
+    function cargarAdmin() {
+      google.script.run.withSuccessHandler(config => {
+        document.getElementById('modoSelect').value = config.modo;
+        if (config.modo === 'Ambos') document.getElementById('usuariosAdminSection').style.display = '';
+        else document.getElementById('usuariosAdminSection').style.display = 'none';
+        cargarUsuariosAdmin();
+        cargarReporte();
+      }).api('getConfig');
     }
 
-    async function guardarModo() {
+    function guardarModo() {
       const modo = document.getElementById('modoSelect').value;
-      const res = await api('updateConfig', {modo});
-      setMsg('modoAdminMsg', `Modo actualizado a ${res.modo}`);
-      cargarAdmin();
+      google.script.run.withSuccessHandler(res => {
+        setMsg('modoAdminMsg', `Modo actualizado a ${res.modo}`);
+        cargarAdmin();
+      }).api('updateConfig', {modo});
     }
 
-    async function cargarUsuariosAdmin() {
-      const users = await api('getUsers');
-      const tbody = document.getElementById('tablaUsuarios').querySelector('tbody');
-      tbody.innerHTML = '';
-      users.forEach(u => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${u.nombre}</td><td>${u.correo}</td><td>${u.rol}</td>
-          <td>
-            <input type="checkbox" ${u.permiteCampo === 'Sí' ? 'checked' : ''} onchange="toggleCampoUser('${u.id}',this.checked)">
-          </td>`;
-        tbody.appendChild(tr);
-      });
+    function cargarUsuariosAdmin() {
+      google.script.run.withSuccessHandler(users => {
+        const tbody = document.getElementById('tablaUsuarios').querySelector('tbody');
+        tbody.innerHTML = '';
+        users.forEach(u => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${u.nombre}</td><td>${u.correo}</td><td>${u.rol}</td>
+            <td>
+              <input type="checkbox" ${u.permiteCampo === 'Sí' ? 'checked' : ''} onchange="toggleCampoUser('${u.id}',this.checked)">
+            </td>`;
+          tbody.appendChild(tr);
+        });
+      }).api('getUsers');
     }
 
-    async function toggleCampoUser(id, checked) {
-      await api('updateUserPermiteCampo', {id, permiteCampo: checked});
-      cargarUsuariosAdmin();
+    function toggleCampoUser(id, checked) {
+      google.script.run.withSuccessHandler(() => cargarUsuariosAdmin())
+        .api('updateUserPermiteCampo', {id, permiteCampo: checked});
     }
 
-    async function cargarReporte() {
-      const asists = await api('getAsistencias', {});
-      const tbody = document.getElementById('tablaReporte').querySelector('tbody');
-      tbody.innerHTML = '';
-      asists.forEach(r => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${r.nombre}</td><td>${r.fecha}</td><td>${r.hora}</td><td>${r.tipo}</td>
-          <td>${r.ubicacion}</td><td>${r.ip}</td><td>${r.userAgent}</td><td>${r.estado}</td>`;
-        tbody.appendChild(tr);
-      });
+    function cargarReporte() {
+      google.script.run.withSuccessHandler(asists => {
+        const tbody = document.getElementById('tablaReporte').querySelector('tbody');
+        tbody.innerHTML = '';
+        asists.forEach(r => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${r.nombre}</td><td>${r.fecha}</td><td>${r.hora}</td><td>${r.tipo}</td>
+            <td>${r.ubicacion}</td><td>${r.ip}</td><td>${r.userAgent}</td><td>${r.estado}</td>`;
+          tbody.appendChild(tr);
+        });
+      }).api('getAsistencias', {});
     }
 
-    async function cargarCaptura() {
+    function cargarCaptura() {
       document.getElementById('tokenInput').value = '';
       setMsg('capturaMsg', '');
     }
 
-    async function capturarQR() {
+    function capturarQR() {
       const token = document.getElementById('tokenInput').value.trim();
       if (!token) return setMsg('capturaMsg', 'Ingrese el token QR', true);
       setMsg('capturaMsg', 'Validando...');
-      const res = await api('registerQR', {token});
-      setMsg('capturaMsg', res.ok ? res.mensaje : res.error, !res.ok);
-      document.getElementById('tokenInput').value = '';
+      google.script.run.withSuccessHandler(res => {
+        setMsg('capturaMsg', res.ok ? res.mensaje : res.error, !res.ok);
+        document.getElementById('tokenInput').value = '';
+      }).api('registerQR', {token});
     }
 
     function setMsg(id, msg, error = false) {
@@ -360,6 +366,7 @@
       document.getElementById('navbar').style.display = 'none';
       document.getElementById('loginSection').style.display = '';
       document.getElementById('loginCorreo').value = '';
+      document.getElementById('loginPass').value = '';
       setMsg('loginMsg', '');
     };
   </script>
