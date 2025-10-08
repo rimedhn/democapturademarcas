@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AttendanceQR Pro - Control de Asistencias</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📱</text></svg>">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+    <style>
+        body {
+            box-sizing: border-box;
+        }
+        
+        /* Animaciones y efectos */
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .slide-in {
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from { transform: translateX(-100%); }
+            to { transform: translateX(0); }
+        }
+        
+        /* Gradientes profesionales */
+        .gradient-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .gradient-secondary {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+        
+        .gradient-success {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+        
+        /* Botones con efecto móvil */
+        .btn-mobile {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-mobile:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.6);
+        }
+        
+        .btn-mobile:active {
+            transform: translateY(0);
+        }
+        
+        /* Cards glassmorphism */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.25);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+        
+        /* QR Container */
+        .qr-container {
+            background: white;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+        
+        /* Loading spinner */
+        .spinner {
+            border: 3px solid #f3f4f6;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Navbar móvil */
+        .mobile-nav {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+        }
+        
+        /* Video scanner */
+        #video {
+            width: 100%;
+            height: 300px;
+            object-fit: cover;
+            border-radius: 15px;
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .mobile-container {
+                padding: 1rem;
+            }
+            
+            .mobile-card {
+                border-radius: 20px;
+                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            }
+        }
+    </style>
+</head>
+<body class="gradient-primary min-h-full">
+    <!-- Loading Screen -->
+    <div id="loadingScreen" class="fixed inset-0 bg-white flex items-center justify-center z-50">
+        <div class="text-center">
+            <div class="spinner mx-auto mb-4"></div>
+            <h2 class="text-xl font-semibold text-gray-700">Cargando AttendanceQR Pro...</h2>
+        </div>
+    </div>
+
+    <!-- Login Screen -->
+    <div id="loginScreen" class="min-h-full flex items-center justify-center p-4 hidden">
+        <div class="glass-card rounded-3xl p-8 w-full max-w-md mobile-card fade-in">
+            <div class="text-center mb-8">
+                <div class="text-6xl mb-4">📱</div>
+                <h1 class="text-3xl font-bold text-white mb-2">AttendanceQR Pro</h1>
+                <p class="text-white/80">Control de Asistencias Inteligente</p>
+            </div>
+            
+            <form id="loginForm" class="space-y-6">
+                <div>
+                    <label class="block text-white font-semibold mb-2">📧 Correo Electrónico</label>
+                    <input type="email" id="loginEmail" required 
+                           class="w-full px-4 py-3 rounded-xl border-0 focus:ring-2 focus:ring-white/50 outline-none"
+                           placeholder="tu@empresa.com">
+                </div>
+                
+                <div>
+                    <label class="block text-white font-semibold mb-2">🔒 Contraseña</label>
+                    <input type="password" id="loginPassword" required 
+                           class="w-full px-4 py-3 rounded-xl border-0 focus:ring-2 focus:ring-white/50 outline-none"
+                           placeholder="••••••••">
+                </div>
+                
+                <button type="submit" class="w-full btn-mobile text-white font-bold py-4 rounded-xl">
+                    <span id="loginBtnText">🚀 Iniciar Sesión</span>
+                    <div id="loginSpinner" class="spinner hidden mx-auto" style="width: 20px; height: 20px;"></div>
+                </button>
+            </form>
+            
+            <div id="loginError" class="hidden mt-4 p-3 bg-red-500/20 border border-red-500/30 rounded-xl text-white text-center"></div>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="mainApp" class="hidden min-h-full">
+        <!-- Header -->
+        <header class="mobile-nav shadow-lg">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between items-center py-4">
+                    <div class="flex items-center space-x-3">
+                        <div class="text-2xl">📱</div>
+                        <div>
+                            <h1 class="text-xl font-bold text-gray-800">AttendanceQR Pro</h1>
+                            <p class="text-sm text-gray-600" id="userWelcome">Bienvenido</p>
+                        </div>
+                    </div>
+                    
+                    <button id="logoutBtn" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors">
+                        🚪 Salir
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Navigation Tabs -->
+        <nav id="navigationTabs" class="bg-white shadow-sm">
+            <div class="max-w-7xl mx-auto px-4">
+                <div class="flex space-x-1 overflow-x-auto">
+                    <button class="nav-tab active" data-tab="dashboard">📊 Dashboard</button>
+                    <button class="nav-tab" data-tab="qr">🔲 Mi QR</button>
+                    <button class="nav-tab" data-tab="history">📋 Historial</button>
+                    <button class="nav-tab admin-only hidden" data-tab="reports">📈 Reportes</button>
+                    <button class="nav-tab admin-only hidden" data-tab="settings">⚙️ Configuración</button>
+                    <button class="nav-tab capture-only hidden" data-tab="capture">📷 Captura</button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Content Container -->
+        <main class="max-w-7xl mx-auto px-4 py-6">
+            <!-- Dashboard Tab -->
+            <div id="dashboardTab" class="tab-content">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div class="glass-card rounded-2xl p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-white/80 text-sm">Registros Hoy</p>
+                                <p class="text-3xl font-bold text-white" id="todayCount">0</p>
+                            </div>
+                            <div class="text-4xl">📅</div>
+                        </div>
+                    </div>
+                    
+                    <div class="glass-card rounded-2xl p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-white/80 text-sm">Esta Semana</p>
+                                <p class="text-3xl font-bold text-white" id="weekCount">0</p>
+                            </div>
+                            <div class="text-4xl">📊</div>
+                        </div>
+                    </div>
+                    
+                    <div class="glass-card rounded-2xl p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-white/80 text-sm">Total Registros</p>
+                                <p class="text-3xl font-bold text-white" id="totalCount">0</p>
+                            </div>
+                            <div class="text-4xl">🎯</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Campo Registration Button -->
+                <div id="campoButton" class="mt-6 hidden">
+                    <button id="registrarCampoBtn" class="w-full btn-mobile text-white font-bold py-4 rounded-xl text-lg">
+                        📍 Registrar Asistencia desde Campo
+                    </button>
+                </div>
+            </div>
+
+            <!-- QR Tab -->
+            <div id="qrTab" class="tab-content hidden">
+                <div class="text-center">
+                    <div class="glass-card rounded-2xl p-8 inline-block">
+                        <h2 class="text-2xl font-bold text-white mb-6">🔲 Tu Código QR Personal</h2>
+                        <div class="qr-container mb-6">
+                            <canvas id="qrCanvas" class="mx-auto"></canvas>
+                        </div>
+                        <button id="refreshQRBtn" class="btn-mobile text-white px-6 py-3 rounded-xl font-semibold">
+                            🔄 Actualizar QR
+                        </button>
+                        <p class="text-white/80 text-sm mt-4">
+                            QR válido por <span id="qrTimer">5:00</span> minutos
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- History Tab -->
+            <div id="historyTab" class="tab-content hidden">
+                <div class="glass-card rounded-2xl p-6">
+                    <h2 class="text-2xl font-bold text-white mb-6">📋 Historial de Asistencias</h2>
+                    <div id="historyList" class="space-y-3 max-h-96 overflow-y-auto">
+                        <div class="text-center text-white/80 py-8">
+                            <div class="text-4xl mb-2">📦</div>
+                            <p>Cargando historial...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reports Tab (Admin Only) -->
+            <div id="reportsTab" class="tab-content hidden">
+                <div class="glass-card rounded-2xl p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-bold text-white">📈 Reportes de Asistencia</h2>
+                        <button id="downloadCSVBtn" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg">
+                            📥 Descargar CSV
+                        </button>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <div>
+                            <label class="block text-white font-semibold mb-2">Fecha Inicio</label>
+                            <input type="date" id="startDate" class="w-full px-3 py-2 rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block text-white font-semibold mb-2">Fecha Fin</label>
+                            <input type="date" id="endDate" class="w-full px-3 py-2 rounded-lg">
+                        </div>
+                    </div>
+                    
+                    <div id="reportsList" class="space-y-3 max-h-96 overflow-y-auto">
+                        <div class="text-center text-white/80 py-8">
+                            <div class="text-4xl mb-2">📊</div>
+                            <p>Selecciona un rango de fechas para ver reportes</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings Tab (Admin Only) -->
+            <div id="settingsTab" class="tab-content hidden">
+                <div class="glass-card rounded-2xl p-6">
+                    <h2 class="text-2xl font-bold text-white mb-6">⚙️ Configuración del Sistema</h2>
+                    
+                    <div class="space-y-6">
+                        <div>
+                            <label class="block text-white font-semibold mb-3">Modo de Captura</label>
+                            <div class="space-y-2">
+                                <label class="flex items-center space-x-3 text-white">
+                                    <input type="radio" name="modoCaptura" value="QR" class="text-blue-500">
+                                    <span>🔲 Solo QR (Interface de captura)</span>
+                                </label>
+                                <label class="flex items-center space-x-3 text-white">
+                                    <input type="radio" name="modoCaptura" value="Campo" class="text-blue-500">
+                                    <span>📍 Solo Campo (Botón en dispositivo)</span>
+                                </label>
+                                <label class="flex items-center space-x-3 text-white">
+                                    <input type="radio" name="modoCaptura" value="Ambos" class="text-blue-500">
+                                    <span>🔄 Ambos métodos</span>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <button id="saveSettingsBtn" class="btn-mobile text-white px-6 py-3 rounded-xl font-semibold">
+                            💾 Guardar Configuración
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Capture Tab -->
+            <div id="captureTab" class="tab-content hidden">
+                <div class="glass-card rounded-2xl p-6">
+                    <h2 class="text-2xl font-bold text-white mb-6 text-center">📷 Captura de Asistencias</h2>
+                    
+                    <div class="text-center mb-6">
+                        <button id="startCameraBtn" class="btn-mobile text-white px-6 py-3 rounded-xl font-semibold mb-4">
+                            📹 Iniciar Cámara
+                        </button>
+                        <button id="stopCameraBtn" class="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-xl font-semibold mb-4 hidden">
+                            ⏹️ Detener Cámara
+                        </button>
+                    </div>
+                    
+                    <div id="cameraContainer" class="hidden mb-6">
+                        <video id="video" autoplay muted playsinline></video>
+                        <canvas id="canvas" class="hidden"></canvas>
+                    </div>
+                    
+                    <div id="captureResult" class="hidden p-4 rounded-xl text-center font-semibold"></div>
+                    
+                    <!-- Historial de capturas recientes -->
+                    <div class="mt-8">
+                        <h3 class="text-xl font-bold text-white mb-4">📋 Capturas Recientes</h3>
+                        <div id="recentCaptures" class="space-y-2 max-h-60 overflow-y-auto">
+                            <div class="text-center text-white/80 py-4">
+                                <p>No hay capturas recientes</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="bg-white/10 backdrop-blur-sm mt-12">
+            <div class="max-w-7xl mx-auto px-4 py-6">
+                <div class="text-center text-white/80">
+                    <p>&copy; 2024 AttendanceQR Pro. Sistema de Control de Asistencias.</p>
+                    <p class="text-sm mt-1">Desarrollado con ❤️ para tu empresa</p>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        // Variables globales
+        let currentUser = null;
+        let qrTimer = null;
+        let cameraStream = null;
+        let isScanning = false;
+
+        // Elementos del DOM
+        const loadingScreen = document.getElementById('loadingScreen');
+        const loginScreen = document.getElementById('loginScreen');
+        const mainApp = document.getElementById('mainApp');
+        const loginForm = document.getElementById('loginForm');
+        const navigationTabs = document.getElementById('navigationTabs');
+
+        // Configuración de la aplicación
+        const APP_CONFIG = {
+            QR_VALIDITY_MINUTES: 5,
+            SCAN_INTERVAL: 500,
+            API_BASE_URL: 'https://script.google.com/macros/s/AKfycbzrMof0yEyImmjRyAed_m9kRrWwBNvbzqt_IznRoU9_qHBettZnFZqiAmnbxAg4b2GW/exec'
+        };
+
+        // Inicialización de la aplicación
+        document.addEventListener('DOMContentLoaded', async () => {
+            await initializeApp();
+        });
+
+        async function initializeApp() {
+            try {
+                // Verificar si hay sesión guardada
+                const savedSession = localStorage.getItem('attendanceQR_session');
+                if (savedSession) {
+                    const sessionData = JSON.parse(savedSession);
+                    if (await validateSession(sessionData)) {
+                        currentUser = sessionData;
+                        showMainApp();
+                        return;
+                    }
+                }
+                
+                // Mostrar pantalla de login
+                setTimeout(() => {
+                    loadingScreen.classList.add('hidden');
+                    loginScreen.classList.remove('hidden');
+                }, 1500);
+                
+            } catch (error) {
+                console.error('Error inicializando app:', error);
+                showLoginScreen();
+            }
+        }
+
+        // Manejo del login
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            const loginBtn = document.getElementById('loginBtnText');
+            const loginSpinner = document.getElementById('loginSpinner');
+            const loginError = document.getElementById('loginError');
+            
+            // Estado de carga
+            loginBtn.classList.add('hidden');
+            loginSpinner.classList.remove('hidden');
+            loginError.classList.add('hidden');
+            
+            try {
+                const response = await fetch(APP_CONFIG.API_BASE_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'login',
+                        email: email,
+                        password: password
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    currentUser = result.user;
+                    localStorage.setItem('attendanceQR_session', JSON.stringify(currentUser));
+                    showMainApp();
+                } else {
+                    showError(loginError, result.message || 'Credenciales incorrectas');
+                }
+                
+            } catch (error) {
+                console.error('Error en login:', error);
+                showError(loginError, 'Error de conexión. Inténtalo de nuevo.');
+            } finally {
+                loginBtn.classList.remove('hidden');
+                loginSpinner.classList.add('hidden');
+            }
+        });
+
+        function showMainApp() {
+            loginScreen.classList.add('hidden');
+            mainApp.classList.remove('hidden');
+            
+            setupUserInterface();
+            loadDashboardData();
+            
+            // Si es usuario de captura, ir directo a la pestaña de captura
+            if (currentUser.rol === 'Captura') {
+                showTab('capture');
+            }
+        }
+
+        function setupUserInterface() {
+            // Configurar bienvenida
+            document.getElementById('userWelcome').textContent = `Bienvenido, ${currentUser.nombre}`;
+            
+            // Mostrar/ocultar pestañas según el rol
+            const adminTabs = document.querySelectorAll('.admin-only');
+            const captureTabs = document.querySelectorAll('.capture-only');
+            
+            if (currentUser.rol === 'Admin') {
+                adminTabs.forEach(tab => tab.classList.remove('hidden'));
+            }
+            
+            if (currentUser.rol === 'Captura') {
+                captureTabs.forEach(tab => tab.classList.remove('hidden'));
+                // Ocultar otras pestañas para usuario de captura
+                document.querySelectorAll('.nav-tab:not(.capture-only)').forEach(tab => {
+                    tab.classList.add('hidden');
+                });
+            }
+            
+            // Configurar botón de campo si está permitido
+            setupCampoButton();
+            
+            // Generar QR inicial
+            generateQR();
+            
+            // Configurar navegación
+            setupNavigation();
+        }
+
+        function setupNavigation() {
+            const navTabs = document.querySelectorAll('.nav-tab');
+            navTabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    const tabName = tab.dataset.tab;
+                    showTab(tabName);
+                    
+                    // Actualizar estado activo
+                    navTabs.forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                });
+            });
+        }
+
+        function showTab(tabName) {
+            // Ocultar todas las pestañas
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.add('hidden');
+            });
+            
+            // Mostrar pestaña seleccionada
+            document.getElementById(tabName + 'Tab').classList.remove('hidden');
+            
+            // Cargar datos específicos de la pestaña
+            switch(tabName) {
+                case 'history':
+                    loadHistory();
+                    break;
+                case 'reports':
+                    loadReports();
+                    break;
+                case 'settings':
+                    loadSettings();
+                    break;
+                case 'capture':
+                    loadRecentCaptures();
+                    break;
+            }
+        }
+
+        async function generateQR() {
+            try {
+                const token = generateToken();
+                const qrData = JSON.stringify({
+                    userId: currentUser.id,
+                    token: token,
+                    timestamp: Date.now()
+                });
+                
+                const canvas = document.getElementById('qrCanvas');
+                await QRCode.toCanvas(canvas, qrData, {
+                    width: 256,
+                    margin: 2,
+                    color: {
+                        dark: '#000000',
+                        light: '#FFFFFF'
+                    }
+                });
+                
+                startQRTimer();
+                
+            } catch (error) {
+                console.error('Error generando QR:', error);
+            }
+        }
+
+        function generateToken() {
+            const timestamp = Math.floor(Date.now() / (1000 * 60 * APP_CONFIG.QR_VALIDITY_MINUTES));
+            return btoa(`${currentUser.id}_${timestamp}_${Math.random()}`);
+        }
+
+        function startQRTimer() {
+            clearInterval(qrTimer);
+            let timeLeft = APP_CONFIG.QR_VALIDITY_MINUTES * 60;
+            
+            const timerElement = document.getElementById('qrTimer');
+            
+            qrTimer = setInterval(() => {
+                const minutes = Math.floor(timeLeft / 60);
+                const seconds = timeLeft % 60;
+                timerElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                
+                timeLeft--;
+                
+                if (timeLeft < 0) {
+                    generateQR(); // Auto-renovar QR
+                }
+            }, 1000);
+        }
+
+        // Botón de actualizar QR
+        document.getElementById('refreshQRBtn').addEventListener('click', generateQR);
+
+        // Configurar botón de campo
+        function setupCampoButton() {
+            const campoButton = document.getElementById('campoButton');
+            const registrarBtn = document.getElementById('registrarCampoBtn');
+            
+            // Mostrar botón según configuración y permisos
+            if (currentUser.permiteCampo === 'Sí' && currentUser.rol !== 'Captura') {
+                campoButton.classList.remove('hidden');
+                
+                registrarBtn.addEventListener('click', async () => {
+                    await registrarAsistenciaCampo();
+                });
+            }
+        }
+
+        async function registrarAsistenciaCampo() {
+            try {
+                const position = await getCurrentPosition();
+                const deviceInfo = getDeviceInfo();
+                
+                const response = await fetch(APP_CONFIG.API_BASE_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'registrarAsistencia',
+                        userId: currentUser.id,
+                        tipo: 'Campo',
+                        ubicacion: `${position.coords.latitude},${position.coords.longitude}`,
+                        ip: deviceInfo.ip,
+                        userAgent: deviceInfo.userAgent
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showNotification('✅ Asistencia registrada correctamente', 'success');
+                    loadDashboardData();
+                } else {
+                    showNotification('❌ Error al registrar asistencia', 'error');
+                }
+                
+            } catch (error) {
+                console.error('Error registrando asistencia:', error);
+                showNotification('❌ Error de ubicación o conexión', 'error');
+            }
+        }
+
+        // Funciones de cámara para captura
+        document.getElementById('startCameraBtn').addEventListener('click', startCamera);
+        document.getElementById('stopCameraBtn').addEventListener('click', stopCamera);
+
+        async function startCamera() {
+            try {
+                cameraStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'environment' } 
+                });
+                
+                const video = document.getElementById('video');
+                video.srcObject = cameraStream;
+                
+                document.getElementById('cameraContainer').classList.remove('hidden');
+                document.getElementById('startCameraBtn').classList.add('hidden');
+                document.getElementById('stopCameraBtn').classList.remove('hidden');
+                
+                startScanning();
+                
+            } catch (error) {
+                console.error('Error accediendo a la cámara:', error);
+                showNotification('❌ No se pudo acceder a la cámara', 'error');
+            }
+        }
+
+        function stopCamera() {
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(track => track.stop());
+                cameraStream = null;
+            }
+            
+            isScanning = false;
+            document.getElementById('cameraContainer').classList.add('hidden');
+            document.getElementById('startCameraBtn').classList.remove('hidden');
+            document.getElementById('stopCameraBtn').classList.add('hidden');
+        }
+
+        function startScanning() {
+            isScanning = true;
+            const video = document.getElementById('video');
+            const canvas = document.getElementById('canvas');
+            const context = canvas.getContext('2d');
+            
+            function scan() {
+                if (!isScanning) return;
+                
+                if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                    canvas.height = video.videoHeight;
+                    canvas.width = video.videoWidth;
+                    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    
+                    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                    const code = jsQR(imageData.data, imageData.width, imageData.height);
+                    
+                    if (code) {
+                        processQRCode(code.data);
+                    }
+                }
+                
+                setTimeout(scan, APP_CONFIG.SCAN_INTERVAL);
+            }
+            
+            scan();
+        }
+
+        async function processQRCode(qrData) {
+            try {
+                const data = JSON.parse(qrData);
+                
+                const response = await fetch(APP_CONFIG.API_BASE_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'validarQR',
+                        qrData: data
+                    })
+                });
+                
+                const result = await response.json();
+                
+                const resultDiv = document.getElementById('captureResult');
+                resultDiv.classList.remove('hidden');
+                
+                if (result.success) {
+                    resultDiv.className = 'p-4 rounded-xl text-center font-semibold bg-green-500 text-white';
+                    resultDiv.textContent = `✅ ${result.message}`;
+                    loadRecentCaptures();
+                } else {
+                    resultDiv.className = 'p-4 rounded-xl text-center font-semibold bg-red-500 text-white';
+                    resultDiv.textContent = `❌ ${result.message}`;
+                }
+                
+                setTimeout(() => {
+                    resultDiv.classList.add('hidden');
+                }, 3000);
+                
+            } catch (error) {
+                console.error('Error procesando QR:', error);
+            }
+        }
+
+        // Cargar datos del dashboard
+        async function loadDashboardData() {
+            try {
+                const response = await fetch(APP_CONFIG.API_BASE_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'getDashboardData',
+                        userId: currentUser.id
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    document.getElementById('todayCount').textContent = result.data.today || 0;
+                    document.getElementById('weekCount').textContent = result.data.week || 0;
+                    document.getElementById('totalCount').textContent = result.data.total || 0;
+                }
+                
+            } catch (error) {
+                console.error('Error cargando dashboard:', error);
+            }
+        }
+
+        // Funciones auxiliares
+        function getCurrentPosition() {
+            return new Promise((resolve, reject) => {
+                navigator.geolocation.getCurrentPosition(resolve, reject);
+            });
+        }
+
+        function getDeviceInfo() {
+            return {
+                userAgent: navigator.userAgent,
+                ip: 'Detectar en servidor' // Se detecta en el backend
+            };
+        }
+
+        function showError(element, message) {
+            element.textContent = message;
+            element.classList.remove('hidden');
+        }
+
+        function showNotification(message, type) {
+            // Crear notificación temporal
+            const notification = document.createElement('div');
+            notification.className = `fixed top-4 right-4 p-4 rounded-xl text-white font-semibold z-50 ${
+                type === 'success' ? 'bg-green-500' : 'bg-red-500'
+            }`;
+            notification.textContent = message;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+
+        async function validateSession(sessionData) {
+            // Validar sesión con el servidor
+            try {
+                const response = await fetch(APP_CONFIG.API_BASE_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'validateSession',
+                        sessionData: sessionData
+                    })
+                });
+                
+                const result = await response.json();
+                return result.success;
+                
+            } catch (error) {
+                return false;
+            }
+        }
+
+        function showLoginScreen() {
+            loadingScreen.classList.add('hidden');
+            loginScreen.classList.remove('hidden');
+        }
+
+        // Logout
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            localStorage.removeItem('attendanceQR_session');
+            currentUser = null;
+            stopCamera();
+            clearInterval(qrTimer);
+            
+            mainApp.classList.add('hidden');
+            loginScreen.classList.remove('hidden');
+            
+            // Limpiar formulario
+            loginForm.reset();
+        });
+
+        // Estilos para pestañas de navegación
+        const style = document.createElement('style');
+        style.textContent = `
+            .nav-tab {
+                padding: 12px 20px;
+                border-radius: 8px;
+                background: transparent;
+                color: #6b7280;
+                font-weight: 500;
+                transition: all 0.2s;
+                white-space: nowrap;
+            }
+            
+            .nav-tab:hover {
+                background: #f3f4f6;
+                color: #374151;
+            }
+            
+            .nav-tab.active {
+                background: #667eea;
+                color: white;
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Funciones adicionales que se implementarán según necesidad
+        async function loadHistory() {
+            // Implementar carga de historial
+        }
+
+        async function loadReports() {
+            // Implementar carga de reportes
+        }
+
+        async function loadSettings() {
+            // Implementar carga de configuración
+        }
+
+        async function loadRecentCaptures() {
+            // Implementar carga de capturas recientes
+        }
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'98b263ffb684b4fc',t:'MTc1OTg5MjQ1NC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
